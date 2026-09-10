@@ -29,7 +29,7 @@ datasource db {
   // but break migrations. `directUrl` (direct, non-pooled connection string)
   // is used by `prisma db push` / `migrate`. scripts/prisma-setup.mjs defaults
   // it to DATABASE_URL when not provided.
-  directUrl = env("DIRECT_DATABASE_URL")
+  
 }
 
 // ---------------------------------------------------------------------------
