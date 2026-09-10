@@ -1,15 +1,5 @@
 # Voice AI Agent — Patient Registration System
 
-A voice-based AI agent, reachable **by phone**, that registers patients through natural conversation,
-persists them to a database through a validated REST API, and remembers them on the next call.
-
-> **Assessment note:** this repository is the complete, runnable system. The hosted preview runs the
-> **web voice simulator** (browser STT/TTS driving the *same* agent engine the phone line uses) because
-> a sandbox preview cannot place PSTN calls. The **Architecture tab** in the app and the
-> [Provisioning a real phone number](#provisioning-a-real-phone-number) section below document the
-> exact steps (Vapi or Twilio) to attach a real, dialable U.S. number to this same deployment.
-
----
 
 ## Live demo / submission checklist
 
@@ -263,29 +253,6 @@ dataset exactly — types, defaults, and constraints — plus:
 
 ---
 
-## Provisioning a real phone number
-
-Both paths are fully wired — **no code changes needed**, only provider configuration.
-
-### Path A — Vapi (recommended, fastest)
-
-1. Sign up at [vapi.ai](https://vapi.ai) → **Phone Numbers** → buy a U.S. number.
-2. Create an Assistant → import the config served at `/docs/vapi-assistant-config.json`
-   (it contains the full system prompt, voice, transcriber, and tool wiring).
-3. Set the assistant **serverUrl** to `https://<YOUR-DOMAIN>/api/telephony/vapi`.
-4. Call the number. Vapi handles telephony/STT/TTS; tool calls
-   (`register_patient`, `update_patient`, `get_patient_by_phone`, `schedule_appointment`) hit the
-   webhook and write through the same service layer as the REST API.
-
-### Path B — Twilio Programmable Voice
-
-1. Buy a voice-capable U.S. number in the Twilio Console.
-2. **A call comes in** → Webhook `POST https://<YOUR-DOMAIN>/api/telephony/twilio`.
-3. The webhook runs the same agent engine turn-by-turn: `<Say>` speaks the reply,
-   `<Gather input="speech">` listens, loops until the agent is done, then `<Hangup/>`.
-
-For local development/review, expose the dev server with `ngrok http 3000` and use the https URL as
-`<YOUR-DOMAIN>` (also set `APP_BASE_URL`).
 
 ### Deployment
 
