@@ -1,0 +1,108 @@
+// ============================================================================
+// Voice AI Agent — Patient Registration System
+// Prisma schema — DEFAULT: PostgreSQL (production / Vercel / any server)
+//
+// WHY POSTGRESQL AS DEFAULT?
+// - Serverless hosts (Vercel, Netlify, AWS Lambda) have a read-only, ephemeral
+//   filesystem: SQLite cannot run there. Production uses a hosted PostgreSQL
+//   (Neon, Supabase, Vercel Postgres, RDS, ...).
+// - `prisma db push` / `migrate deploy` during the build auto-create all
+//   tables; the app additionally self-provisions at runtime (src/lib/db-bootstrap.ts).
+//
+// LOCAL DEVELOPMENT (zero setup): `scripts/prisma-setup.mjs` auto-detects a
+// `file:` DATABASE_URL and switches to prisma/schema.sqlite.prisma — the
+// models here and there are IDENTICAL, keep both in sync.
+// ============================================================================
+
+generator client {
+  provider      = "prisma-client-js"
+  // rhel-openssl-3.0.x = Amazon Linux 2023 (Vercel/AWS serverless runtime).
+  // Building the extra engine here guarantees the query engine is bundled
+  // even when the client is generated on a different OS (e.g. locally).
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Neon/Supabase pooled endpoints (pgbouncer) are great for runtime queries
+  // but break migrations. `directUrl` (direct, non-pooled connection string)
+  // is used by `prisma db push` / `migrate`. scripts/prisma-setup.mjs defaults
+  // it to DATABASE_URL when not provided.
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Patient — standard minimum U.S. demographic dataset
+// ---------------------------------------------------------------------------
+model Patient {
+  patient_id              String   @id @default(uuid())
+  first_name              String
+  last_name               String
+  date_of_birth           DateTime
+  sex                     String // Male | Female | Other | Decline to Answer
+  phone_number            String // normalized 10-digit, e.g. "4155551234"
+  email                   String?
+  address_line_1          String
+  address_line_2          String?
+  city                    String
+  state                   String // 2-letter USPS abbreviation
+  zip_code                String // 5-digit or ZIP+4
+  insurance_provider      String?
+  insurance_member_id     String?
+  preferred_language      String   @default("English")
+  emergency_contact_name  String?
+  emergency_contact_phone String?
+  created_at              DateTime @default(now()) // UTC
+  updated_at              DateTime @updatedAt // UTC
+  deleted_at              DateTime? // soft delete marker
+
+  appointments Appointment[]
+
+  @@index([phone_number])
+  @@index([last_name])
+  @@index([date_of_birth])
+  @@map("patients")
+}
+
+// ---------------------------------------------------------------------------
+// CallSession — observability: one row per call/registration conversation.
+// ---------------------------------------------------------------------------
+model CallSession {
+  id             String    @id @default(uuid())
+  session_id     String    @unique // conversation session key (call sid / web session)
+  channel        String    @default("web") // web | vapi | twilio
+  caller_number  String? // caller id when available
+  language       String    @default("en") // en | es
+  status         String    @default("in_progress") // in_progress | completed | abandoned | failed
+  outcome        String? // registered | updated | declined_optional | abandoned | failed | duplicate_new
+  transcript     String    @default("[]") // JSON: [{ role, content, at }]
+  collected_data String? // JSON snapshot of final collected payload
+  patient_id     String? // linked patient on success
+  error_message  String?
+  started_at     DateTime  @default(now())
+  ended_at       DateTime?
+
+  @@index([started_at])
+  @@index([patient_id])
+  @@map("call_sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Appointment — bonus feature: schedule a first appointment after registration
+// ---------------------------------------------------------------------------
+model Appointment {
+  id               String   @id @default(uuid())
+  patient_id       String
+  appointment_date DateTime
+  provider         String // mock provider name
+  reason           String? // e.g. "New patient intake"
+  status           String   @default("scheduled") // scheduled | cancelled | completed
+  created_at       DateTime @default(now())
+
+  patient Patient @relation(fields: [patient_id], references: [patient_id])
+
+  @@index([patient_id])
+  @@index([appointment_date])
+  @@map("appointments")
+}
